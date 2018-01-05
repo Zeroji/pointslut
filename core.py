@@ -5,9 +5,16 @@ import time
 import requests
 
 API = 'https://api.imgur.com/3/'
+CFG_PATH = 'config.json'
 MAX_ATTEMPTS = 5
 USAGE_LOG = 'usage.log'
 
+if os.path.isfile(CFG_PATH):
+    CONFIG = {}
+    with open(CFG_PATH, 'r') as config_file:
+        CONFIG = json.load(config_file)
+    MAX_ATTEMPTS = CONFIG.get('max_attempts', MAX_ATTEMPTS)
+    USAGE_LOG = CONFIG.get('usage_log', USAGE_LOG)
 
 def log_usage(request):
     """Log API usage information."""
