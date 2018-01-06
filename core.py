@@ -17,6 +17,11 @@ if os.path.isfile(CFG_PATH):
     USAGE_LOG = CONFIG.get('usage_log', USAGE_LOG)
 
 
+def copy_keys(data, *keys):
+    """Create a subset of a dict, discarding empty values."""
+    return {key: value for key, value in data.items() if key in keys and value}
+
+
 def log_usage(request):
     """Log API usage information."""
     now = int(time.time())
@@ -72,3 +77,19 @@ class Session:
         if data is None:
             data = {}
         return self._request(requests.post, url, data=data)
+
+    def upload(self, image, album=None):
+        """Reupload an image. Return ID or False."""
+        data = copy_keys(image, 'title', 'description')
+        data['type'] = 'URL'
+        if album is not None:
+            data['album'] = album
+        link = image['link']
+        if image['animated']:
+            # GIFs seem to be linked as thumbnails named [ID]h.gif
+            link = link.replace('h.gif', '.gif')
+        req = self.post('image', data=data)
+        if not req['success']:
+            return False
+        uid = req['data']['id']
+        return uid
