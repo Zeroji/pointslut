@@ -14,6 +14,17 @@ FAIL_LIMIT = 3
 FP_EDIT = re.compile(r'((\b.{,6}viral\s*|f.{,6}p.{,6})\bedit\b|'
                      r'\bedit\b.{,40}f.{,6}p|\*?edit[ *]{,2}:)',
                      re.IGNORECASE)
+DESC = '\n\n( original post by {account_url}: {link} )'
+
+
+def clean(text):
+    """Remove FP edits and similar updates."""
+    if not isinstance(text, str):
+        return text
+    match = re.search(FP_EDIT, text)
+    if match is not None:
+        text = text[:match.start()]
+    return text
 
 
 def repost(token):
@@ -22,8 +33,28 @@ def repost(token):
     whore = core.Session(token)
 
     def reshare(post):
-        # Magic
-        pass
+        """Repost an album and share the post."""
+        post['description'] = clean(post['description'])
+
+        def clean_image(image, _, success, album):
+            """Clean up description and edit first image."""
+            image['description'] = clean(image['description'])
+            if success == 0:
+                desc = image.get('description') or ''
+                desc += DESC.format(**album)
+                image['description'] = desc.strip()
+            return image
+
+        album = whore.upload_album(post, [clean_image])
+        if not album:
+            return False
+        data = core.copy_keys(post, 'title', 'topic')
+        if post['tags']:
+            tags = [tag['name'] for tag in post['tags']]
+            data['tags'] = ','.join(tags[:5])  # Imgur only allows 5 tags
+        log.info('Sharing album %s to the gallery as %s', album, data['title'])
+        req = whore.post('gallery/album/%s' % album, data=data)
+        return req['success']
 
     page = random.randint(PAGE_MIN, PAGE_MAX)
     log.info('Fetching gallery from %d days ago', page)
