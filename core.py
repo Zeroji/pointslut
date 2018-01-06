@@ -1,8 +1,12 @@
 """Core utilities."""
 import json
+import logging
 import os
 import time
 import requests
+
+# pylint: disable=C0103
+log = logging.getLogger()
 
 API = 'https://api.imgur.com/3/'
 CFG_PATH = 'config.json'
@@ -22,7 +26,7 @@ def copy_keys(data, *keys):
     return {key: value for key, value in data.items() if key in keys and value}
 
 
-def log_usage(request):
+def _log_usage(request):
     """Log API usage information."""
     now = int(time.time())
     client_remaining = request.headers.get('X-RateLimit-ClientRemaining')
@@ -30,6 +34,10 @@ def log_usage(request):
     reset = request.headers.get('X-RateLimit-UserReset')
     if not all((client_remaining, user_remaining, reset)):
         return
+    if client_remaining < 1000 and client_remaining % 200 == 0:
+        log.WARN('API Usage: %s client credits remaining', client_remaining)
+    if user_remaining < 1000 and user_remaining % 200 == 0:
+        log.WARN('API Usage: %s user credits remaining', user_remaining)
     delay = reset - now
     with open(USAGE_LOG, 'a') as log_file:
         log_file.write(','.join(map(str, (now, client_remaining,
@@ -40,7 +48,7 @@ def log_usage(request):
 class Session:
     """Various token-based methods."""
 
-    def __init__(self, token, bearer=True, log=True):
+    def __init__(self, token, bearer=True, log_usage=True):
         """Create a session."""
         if os.path.isfile(token):
             with open(token, 'r') as token_file:
@@ -52,7 +60,7 @@ class Session:
                 self.token = f'Bearer {token}'
             else:
                 self.token = f'Client-ID{token}'
-        self.log = log
+        self.log_usage = log_usage
 
     def _request(self, method, url, **kwargs):
         """Perform an API request."""
@@ -60,11 +68,14 @@ class Session:
         while attempt < MAX_ATTEMPTS:
             req = method(API + url, headers={'Authorization': self.token}, **kwargs)
             if req.status_code >= 500:
-                time.sleep(2**attempt)
+                delay = 2**attempt
                 attempt += 1
+                log.debug('Request #%d failed with code %d, retrying in %d seconds',
+                          attempt, req.status_code, delay)
+                time.sleep(delay)
                 continue
-            if self.log:
-                log_usage(req)
+            if self.log_usage:
+                _log_usage(req)
             return req.json()
         return {'success': False}
 
@@ -90,6 +101,8 @@ class Session:
             link = link.replace('h.gif', '.gif')
         req = self.post('image', data=data)
         if not req['success']:
+            log.warning('Uploading %s failed, skipping', link)
             return False
         uid = req['data']['id']
+        log.debug('Successfully uploaded %s as %s', link, uid)
         return uid
