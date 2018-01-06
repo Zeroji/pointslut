@@ -103,7 +103,16 @@ class Session:
         """Perform a POST request on the API."""
         if data is None:
             data = {}
-        return self._request(requests.post, url, data=data)
+        req = self._request(requests.post, url, data=data)
+        if isinstance(req['data'], dict) and 'error' in req['data']:
+            error = req['data']['error']
+            if isinstance(error, dict) and error['code'] == 429:
+                # Rate limit, wait X minutes before uploading
+                delay = int(error['message'].split('wait ')[1].split()[0])
+                log.info('Rate limited, waiting %d minutes', delay)
+                time.sleep(delay * 60)
+                req = self._request(requests.post, url, data=data)
+        return req
 
     def upload(self, image, album=None):
         """Reupload an image. Return ID or False."""
