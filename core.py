@@ -50,11 +50,25 @@ def _log_usage(request):
 class Session:
     """Various token-based methods."""
 
+    @staticmethod
+    def _dict_token(data):
+        token = data['token']
+        if 'token_type' in data:
+            token = ('%s %s') % (data['token_type'], token)
+        return token
+
     def __init__(self, token, bearer=True, log_usage=True):
         """Create a session."""
+        if isinstance(token, dict):
+            token = self._dict_token(token)
         if os.path.isfile(token):
             with open(token, 'r') as token_file:
                 token = token_file.read().strip()
+        try:
+            data = json.loads(token)
+            token = self._dict_token(data)
+        except json.JSONDecodeError:
+            pass
         if ' ' in token:
             self.token = token
         else:
