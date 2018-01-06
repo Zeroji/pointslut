@@ -132,7 +132,7 @@ class Session:
         log.debug('Successfully uploaded %s as %s', link, uid)
         return uid
 
-    def upload_album(self, album):
+    def upload_album(self, album, lambdas=None):
         """Reupload an album. Return ID or False."""
         aID = album['id']
         count = album['images_count']
@@ -156,6 +156,13 @@ class Session:
                  aID, nID, count)
         success = 0
         for i, image in enumerate(images):
+            if lambdas is not None:
+                for func in lambdas:
+                    image = func(image, i, album)
+                    if image is None:
+                        break
+                if image is None:
+                    continue
             if self.upload(image, album=nID):
                 success += 1
             if (i - success) / count > (1 - ALBUM_RATIO):
