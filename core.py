@@ -36,6 +36,9 @@ def _log_usage(request):
     reset = request.headers.get('X-RateLimit-UserReset')
     if not all((client_remaining, user_remaining, reset)):
         return
+    client_remaining = int(client_remaining)
+    user_remaining = int(user_remaining)
+    reset = int(reset)
     if client_remaining < 1000 and client_remaining % 200 == 0:
         log.WARN('API Usage: %s client credits remaining', client_remaining)
     if user_remaining < 1000 and user_remaining % 200 == 0:
@@ -124,6 +127,7 @@ class Session:
         if image['animated']:
             # GIFs seem to be linked as thumbnails named [ID]h.gif
             link = link.replace('h.gif', '.gif')
+        data['image'] = link
         req = self.post('image', data=data)
         if not req['success']:
             log.warning('Uploading %s failed, skipping', link)
@@ -151,14 +155,14 @@ class Session:
         if not req['success']:
             log.warning('Failed to reupload %s, aborting', aID)
             return False
-        nID = req['data']['album']
+        nID = req['data']['id']
         log.info('Successfully uploaded album %s as %s. Uploading %d images...',
                  aID, nID, count)
         success = 0
         for i, image in enumerate(images):
             if lambdas is not None:
                 for func in lambdas:
-                    image = func(image, i, album)
+                    image = func(image, i, success, album)
                     if image is None:
                         break
                 if image is None:
@@ -171,4 +175,5 @@ class Session:
         if success == 0 or (success < count * ALBUM_RATIO):
             log.warning('Aborting album %s (%s), not enough images (%d out of %d)',
                         nID, aID, success, count)
+            return False
         return nID
