@@ -12,6 +12,7 @@ API = 'https://api.imgur.com/3/'
 CFG_PATH = 'config.json'
 MAX_ATTEMPTS = 5
 USAGE_LOG = 'usage.log'
+ALBUM_RATIO = 0.8
 
 if os.path.isfile(CFG_PATH):
     CONFIG = {}
@@ -19,6 +20,7 @@ if os.path.isfile(CFG_PATH):
         CONFIG = json.load(config_file)
     MAX_ATTEMPTS = CONFIG.get('max_attempts', MAX_ATTEMPTS)
     USAGE_LOG = CONFIG.get('usage_log', USAGE_LOG)
+    ALBUM_RATIO = CONFIG.get('album_ratio', ALBUM_RATIO)
 
 
 def copy_keys(data, *keys):
@@ -106,3 +108,37 @@ class Session:
         uid = req['data']['id']
         log.debug('Successfully uploaded %s as %s', link, uid)
         return uid
+
+    def upload_album(self, album):
+        """Reupload an album. Return ID or False."""
+        aID = album['id']
+        count = album['images_count']
+        images = album['images']
+        if count != len(images):
+            log.debug('Requesting entire album %s', aID)
+            req = self.get('gallery/album/%s' % aID)
+            if not req['success']:
+                log.warning('Couldn\'t retrieve entire album %s, aborting', aID)
+                log.debug(req)
+                return False
+            images.clear()
+            images.extend(req['data']['images'])
+        data = copy_keys(album, 'title', 'topic', 'description', 'cover')
+        req = self.post('album', data=data)
+        if not req['success']:
+            log.warning('Failed to reupload %s, aborting', aID)
+            return False
+        nID = req['data']['album']
+        log.info('Successfully uploaded album %s as %s. Uploading %d images...',
+                 aID, nID, count)
+        success = 0
+        for i, image in enumerate(images):
+            if self.upload(image, album=nID):
+                success += 1
+            if (i - success) / count > (1 - ALBUM_RATIO):
+                # There are too many failed images to reach the ratio
+                break
+        if success == 0 or (success < count * ALBUM_RATIO):
+            log.warning('Aborting album %s (%s), not enough images (%d out of %d)',
+                        nID, aID, success, count)
+        return nID
