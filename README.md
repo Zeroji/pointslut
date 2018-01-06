@@ -12,6 +12,7 @@ A simple code base to run [Imgur](https://imgur.com/) bots.
 Clone this repository and install the required packages.
 
 ```
+git clone https://github.com/Zeroji/pointslut.git
 cd pointslut/
 pip install -r requirements
 ```

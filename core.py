@@ -16,6 +16,7 @@ if os.path.isfile(CFG_PATH):
     MAX_ATTEMPTS = CONFIG.get('max_attempts', MAX_ATTEMPTS)
     USAGE_LOG = CONFIG.get('usage_log', USAGE_LOG)
 
+
 def log_usage(request):
     """Log API usage information."""
     now = int(time.time())
@@ -33,7 +34,9 @@ def log_usage(request):
 
 class Session:
     """Various token-based methods."""
+
     def __init__(self, token, bearer=True, log=True):
+        """Create a session."""
         if os.path.isfile(token):
             with open(token, 'r') as token_file:
                 token = token_file.read().strip()
