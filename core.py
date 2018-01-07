@@ -57,7 +57,7 @@ class Session:
                 Session._proxy_list = json.load(proxy_file)
         proxy = Session._proxy_list[Session._proxy_index % len(Session._proxy_list)]
         Session._proxy_index += 1
-        return {'https': proxy}
+        return proxy
 
     @staticmethod
     def _dict_token(data):
@@ -88,7 +88,14 @@ class Session:
         self.log_usage = log_usage
         self.proxy = None
         if proxied:
-            self.proxy = Session._next_proxy()
+            self.proxy = True
+            self.change_proxy()
+
+    def change_proxy(self):
+        """Pick a new proxy for the proxied session."""
+        if self.proxy is None:
+            return
+        self.proxy = {'https': Session._next_proxy()}
 
     def _request(self, method, url, **kwargs):
         """Perform an API request."""
@@ -97,10 +104,17 @@ class Session:
             try:
                 req = method(API + url,
                              headers={'Authorization': self.token},
-                             proxies=self.proxy, **kwargs)
-            except requests.exceptions.ProxyError:
+                             proxies=self.proxy, timeout=4, **kwargs)
+                if req.status_code == 400:
+                    data = req.json().get('data')
+                    # Occasional error thrown by the API through proxies
+                    if data == {'error': 'These actions are forbidden.'}:
+                        raise requests.exceptions.ProxyError('Invalid proxy')
+            except (requests.exceptions.ProxyError,
+                    requests.exceptions.Timeout,
+                    requests.exceptions.ConnectionError):
                 log.debug('ProxyError on %s, replacing', self.proxy['https'])
-                self.proxy = self._next_proxy()
+                self.change_proxy()
                 continue
             if req.status_code >= 500:
                 delay = 2**attempt
