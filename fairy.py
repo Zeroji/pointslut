@@ -2,6 +2,7 @@
 import json
 import logging
 import os
+import re
 import core
 
 SUCCESS_RATE = 0.8
@@ -66,3 +67,13 @@ class Swarm:
         for fairy in self.fairies:
             results.append(fairy.post(url, data=data))
         return self._aggregate(results)
+
+    def vote(self, modelID, vote=0, gallery=None):
+        """Vote on a comment or gallery post."""
+        VOTES = {-1: 'down', 0: 'veto', 1: 'up'}
+        vote = VOTES.get(vote, vote)
+        # Try to match a comment ID (full numerical)
+        if gallery is None:
+            gallery = re.match(r'^[0-9]{6,12}', modelID) is None
+        url = f'{"gallery" if gallery else "comment"}/{modelID}/vote/{vote}'
+        return self.post(url)
