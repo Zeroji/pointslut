@@ -14,9 +14,10 @@ log = logging.getLogger()
 class Swarm:
     """Lots of cute little helpers."""
 
-    def __init__(self, tokens=None):
+    def __init__(self, tokens=None, proxied=True):
         """Initialize with tokens."""
         self.fairies = []
+        self.proxied = proxied
         if isinstance(tokens, str) and os.path.exists(tokens):
             with open(tokens, 'r') as tokens_file:
                 tokens = json.load(tokens_file)
@@ -24,7 +25,7 @@ class Swarm:
             tokens = list(tokens.values())
         if isinstance(tokens, list):
             for token in tokens:
-                self.fairies.append(core.Session(token))
+                self.fairies.append(core.Session(token, proxied=proxied))
         log.info('Initialized swarm with %d fairies', len(self.fairies))
 
     @staticmethod
@@ -52,7 +53,7 @@ class Swarm:
         if isinstance(fairy, core.Session):
             self.fairies.append(fairy)
         else:
-            self.fairies.append(core.Session(fairy))
+            self.fairies.append(core.Session(fairy, proxied=self.proxied))
 
     def get(self, url):
         """Perform a GET request on the API."""

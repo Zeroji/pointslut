@@ -13,6 +13,7 @@ CFG_PATH = 'config.json'
 MAX_ATTEMPTS = 5
 USAGE_LOG = 'usage.log'
 ALBUM_RATIO = 0.8
+PROXY_LIST = 'proxies.json'
 
 if os.path.isfile(CFG_PATH):
     CONFIG = {}
@@ -21,6 +22,7 @@ if os.path.isfile(CFG_PATH):
     MAX_ATTEMPTS = CONFIG.get('max_attempts', MAX_ATTEMPTS)
     USAGE_LOG = CONFIG.get('usage_log', USAGE_LOG)
     ALBUM_RATIO = CONFIG.get('album_ratio', ALBUM_RATIO)
+    PROXY_LIST = CONFIG.get('proxy_list', PROXY_LIST)
 
 
 def copy_keys(data, *keys):
@@ -53,6 +55,18 @@ def _log_usage(request):
 class Session:
     """Various token-based methods."""
 
+    _proxy_index = 0
+    _proxy_list = []
+
+    @staticmethod
+    def _next_proxy():
+        if not Session._proxy_list and os.path.isfile(PROXY_LIST):
+            with open(PROXY_LIST, 'r') as proxy_file:
+                Session._proxy_list = json.load(proxy_file)
+        proxy = Session._proxy_list[Session._proxy_index % len(Session._proxy_list)]
+        Session._proxy_index += 1
+        return {'https': proxy}
+
     @staticmethod
     def _dict_token(data):
         token = data['token']
@@ -60,7 +74,7 @@ class Session:
             token = ('%s %s') % (data['token_type'], token)
         return token
 
-    def __init__(self, token, bearer=True, log_usage=True):
+    def __init__(self, token, bearer=True, log_usage=True, proxied=False):
         """Create a session."""
         if isinstance(token, dict):
             token = self._dict_token(token)
@@ -80,12 +94,22 @@ class Session:
             else:
                 self.token = f'Client-ID{token}'
         self.log_usage = log_usage
+        self.proxy = None
+        if proxied:
+            self.proxy = Session._next_proxy()
 
     def _request(self, method, url, **kwargs):
         """Perform an API request."""
         attempt = 0
         while attempt < MAX_ATTEMPTS:
-            req = method(API + url, headers={'Authorization': self.token}, **kwargs)
+            try:
+                req = method(API + url,
+                             headers={'Authorization': self.token},
+                             proxies=self.proxy, **kwargs)
+            except requests.exceptions.ProxyError:
+                log.debug('ProxyError on %s, replacing', self.proxy['https'])
+                self.proxy = self._next_proxy()
+                continue
             if req.status_code >= 500:
                 delay = 2**attempt
                 attempt += 1

@@ -49,6 +49,22 @@ refresh them. You can refresh several files at once.
 python refresh.py token_1.json token_2.json
 ```
 
+### Proxies
+
+You can use sessions through proxies if you create them with `proxied=True`.
+Proxies are fetched from a JSON file, which should contain an array of HTTPS
+proxies, including the scheme, host and port. Example:
+
+```json
+[
+    "https://127.0.0.1:8080",
+    "https://12.34.56.78:3128"
+]
+```
+
+Proxies are used in the order they're given, and automatically rotated. Any
+proxy throwing an error will immediatly be replaced with a new one.
+
 ### Complex grammar
 
 You can write rules to generate text out of many randomized elements.
