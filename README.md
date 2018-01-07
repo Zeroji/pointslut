@@ -27,6 +27,7 @@ or as a file name. The following file formats are accepted for sessions:
   > Note: this type of token cannot be refreshed by `refresh.py`!
   > If you need to refresh your tokens, please use another file format.
 - JSON format: tokens are represented as dictionaries, with the following data:
+
   Key            |Required|Description
   ---------------|--------|-----------
   `token`        |required|Authentication token, without prefix
