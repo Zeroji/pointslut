@@ -1,4 +1,5 @@
 """Core utilities."""
+import configparser
 import json
 import logging
 import os
@@ -9,20 +10,11 @@ import requests
 log = logging.getLogger()
 
 API = 'https://api.imgur.com/3/'
-CFG_PATH = 'config.json'
-MAX_ATTEMPTS = 5
-USAGE_LOG = 'usage.log'
-ALBUM_RATIO = 0.8
-PROXY_LIST = 'proxies.json'
 
-if os.path.isfile(CFG_PATH):
-    CONFIG = {}
-    with open(CFG_PATH, 'r') as config_file:
-        CONFIG = json.load(config_file)
-    MAX_ATTEMPTS = CONFIG.get('max_attempts', MAX_ATTEMPTS)
-    USAGE_LOG = CONFIG.get('usage_log', USAGE_LOG)
-    ALBUM_RATIO = CONFIG.get('album_ratio', ALBUM_RATIO)
-    PROXY_LIST = CONFIG.get('proxy_list', PROXY_LIST)
+CFG = configparser.ConfigParser()
+CFG.add_section('core')
+CFG.add_section('paths')
+CFG.read('config.ini')
 
 
 def copy_keys(data, *keys):
@@ -46,7 +38,7 @@ def _log_usage(request):
     if user_remaining < 1000 and user_remaining % 200 == 0:
         log.WARN('API Usage: %s user credits remaining', user_remaining)
     delay = reset - now
-    with open(USAGE_LOG, 'a') as log_file:
+    with open(CFG['paths'].get('usage log', 'usage.log'), 'a') as log_file:
         log_file.write(','.join(map(str, (now, client_remaining,
                                           user_remaining, delay))))
         log_file.write('\n')
@@ -60,8 +52,8 @@ class Session:
 
     @staticmethod
     def _next_proxy():
-        if not Session._proxy_list and os.path.isfile(PROXY_LIST):
-            with open(PROXY_LIST, 'r') as proxy_file:
+        if not Session._proxy_list and os.path.isfile(CFG['paths'].get('proxy list')):
+            with open(CFG['paths'].get('proxy list'), 'r') as proxy_file:
                 Session._proxy_list = json.load(proxy_file)
         proxy = Session._proxy_list[Session._proxy_index % len(Session._proxy_list)]
         Session._proxy_index += 1
@@ -101,7 +93,7 @@ class Session:
     def _request(self, method, url, **kwargs):
         """Perform an API request."""
         attempt = 0
-        while attempt < MAX_ATTEMPTS:
+        while attempt < CFG['core'].getint('max attempts', 5):
             try:
                 req = method(API + url,
                              headers={'Authorization': self.token},
@@ -193,10 +185,10 @@ class Session:
                     continue
             if self.upload(image, album=nID):
                 success += 1
-            if (i - success) / count > (1 - ALBUM_RATIO):
+            if (i - success) / count > (1 - CFG['core'].getfloat('success rate', 0.8)):
                 # There are too many failed images to reach the ratio
                 break
-        if success == 0 or (success < count * ALBUM_RATIO):
+        if success == 0 or (success < count * CFG['core'].getfloat('success rate', 0.8)):
             log.warning('Aborting album %s (%s), not enough images (%d out of %d)',
                         nID, aID, success, count)
             return False

@@ -1,9 +1,11 @@
 """Various utilities."""
+import configparser
 import random
 import re
 
 
-MAX_DEPTH = 20
+CFG = configparser.ConfigParser()
+CFG.read('config.ini')
 
 
 def _substitute(text):
@@ -48,7 +50,7 @@ def _eval_to_string(value):
 
 def _get_value(key, src, depth=0, param=None):
     """Get a string value from complex data."""
-    if depth >= MAX_DEPTH:
+    if depth >= CFG['DEFAULT'].getint('max depth', 20):
         return key
     value = src.get(key, key)
 

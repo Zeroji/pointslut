@@ -1,11 +1,16 @@
 """Cute little helpers."""
+import configparser
 import json
 import logging
 import os
 import re
 import core
 
-SUCCESS_RATE = 0.8
+# pylint: disable=W0104
+_CFG = configparser.ConfigParser()
+_CFG.add_section['fairy']
+_CFG.read('config.ini')
+CFG = _CFG['fairy']
 
 # pylint: disable=C0103
 log = logging.getLogger()
@@ -44,7 +49,7 @@ class Swarm:
             else:
                 failure_code = res['status']
                 errors.append(res['status'])
-        if successes / len(results) < SUCCESS_RATE:
+        if successes / len(results) < CFG.getfloat('success rate'):
             return {'data': errors, 'status': failure_code, 'success': False}
         return {'data': success_data, 'status': success_code, 'success': True}
 

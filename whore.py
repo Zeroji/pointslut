@@ -1,20 +1,18 @@
 #!/usr/bin/env python
 """Repost whore."""
+import configparser
 import logging
 import random
 import re
 import sys
 import core
 
-PAGE_MIN = 100
-PAGE_MAX = 1000
-VOTE_RATIO = 10
-FAIL_LIMIT = 3
-
-FP_EDIT = re.compile(r'((\b.{,6}viral\s*|f.{,6}p.{,6})\bedit\b|'
-                     r'\bedit\b.{,40}f.{,6}p|\*?edit[ *]{,2}:)',
-                     re.IGNORECASE)
-DESC = '\n\n( original post by {account_url}: {link} )'
+# pylint: disable=W0104
+_CFG = configparser.ConfigParser()
+_CFG.add_section['whore']
+_CFG.read('config.ini')
+CFG = _CFG['whore']
+FP_EDIT = re.compile(CFG.get('fp edit'), re.IGNORECASE)
 
 
 def clean(text):
@@ -41,7 +39,7 @@ def repost(token):
             image['description'] = clean(image['description'])
             if success == 0:
                 desc = image.get('description') or ''
-                desc += DESC.format(**album)
+                desc += CFG.get('description').format(**album)
                 image['description'] = desc.strip()
             return image
 
@@ -56,7 +54,7 @@ def repost(token):
         req = whore.post('gallery/album/%s' % album, data=data)
         return req['success']
 
-    page = random.randint(PAGE_MIN, PAGE_MAX)
+    page = random.randint(CFG.getint('page min', 100), CFG.getint('page min', 1000))
     log.info('Fetching gallery from %d days ago', page)
     req = whore.get('gallery/hot/viral/%d' % page)
     if not req['success']:
@@ -67,7 +65,7 @@ def repost(token):
 
     fails = 0
     for post in gallery:
-        if post['ups'] < post['downs'] * VOTE_RATIO:
+        if post['ups'] < post['downs'] * CFG.getfloat('vote ratio', 10):
             continue
         if not post['is_album'] or post['is_ad']:
             continue
@@ -76,7 +74,7 @@ def repost(token):
         if reshare(post):
             break
         fails += 1
-        if fails >= FAIL_LIMIT:
+        if fails >= CFG['whore'].getint('max attempts', 3):
             break
 
 
