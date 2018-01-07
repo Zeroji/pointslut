@@ -9,7 +9,7 @@ import core
 
 # pylint: disable=W0104
 _CFG = configparser.ConfigParser()
-_CFG.add_section['whore']
+_CFG.add_section('whore')
 _CFG.read('config.ini')
 CFG = _CFG['whore']
 FP_EDIT = re.compile(CFG.get('fp edit'), re.IGNORECASE)

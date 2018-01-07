@@ -8,7 +8,7 @@ import core
 
 # pylint: disable=W0104
 _CFG = configparser.ConfigParser()
-_CFG.add_section['fairy']
+_CFG.add_section('fairy')
 _CFG.read('config.ini')
 CFG = _CFG['fairy']
 
