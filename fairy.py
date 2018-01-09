@@ -53,6 +53,12 @@ class Swarm:
             return {'data': errors, 'status': failure_code, 'success': False}
         return {'data': success_data, 'status': success_code, 'success': True}
 
+    def _request(self, method, url, data=None):
+        results = []
+        for fairy in self.fairies:
+            results.append(method(fairy, url, data=data))
+        return self._aggregate(results)
+
     def add(self, fairy):
         """Add a cute little helper."""
         if isinstance(fairy, core.Session):
@@ -62,17 +68,11 @@ class Swarm:
 
     def get(self, url):
         """Perform a GET request on the API."""
-        results = []
-        for fairy in self.fairies:
-            results.append(fairy.get(url))
-        return self._aggregate(results)
+        return self._request(core.Session.get, url)
 
     def post(self, url, data=None):
         """Perform a POST request on the API."""
-        results = []
-        for fairy in self.fairies:
-            results.append(fairy.post(url, data=data))
-        return self._aggregate(results)
+        return self._request(core.Session.post, url, data=data)
 
     def vote(self, modelID, vote=0, gallery=None):
         """Vote on a comment or gallery post."""

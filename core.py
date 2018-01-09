@@ -128,9 +128,9 @@ class Session:
             return req.json()
         return {'success': False}
 
-    def get(self, url):
+    def get(self, url, data=None):
         """Perform a GET request on the API."""
-        return self._request(requests.get, url)
+        return self._request(requests.get, url, data=data)
 
     def post(self, url, data=None):
         """Perform a POST request on the API."""
