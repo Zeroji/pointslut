@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import re
+import concurrent.futures
 import core
 
 # pylint: disable=W0104
@@ -19,10 +20,15 @@ log = logging.getLogger()
 class Swarm:
     """Lots of cute little helpers."""
 
-    def __init__(self, tokens=None, proxied=True):
+    def __init__(self, tokens=None, proxied=True, threaded=False):
         """Initialize with tokens."""
         self.fairies = []
         self.proxied = proxied
+        self.threaded = threaded
+        self.executor = None
+        self.futures = []
+        if threaded:
+            self.executor = concurrent.futures.ThreadPoolExecutor()
         if isinstance(tokens, str) and os.path.exists(tokens):
             with open(tokens, 'r') as tokens_file:
                 tokens = json.load(tokens_file)
@@ -30,7 +36,8 @@ class Swarm:
             tokens = list(tokens.values())
         if isinstance(tokens, list):
             for token in tokens:
-                self.fairies.append(core.Session(token, proxied=proxied))
+                self.fairies.append(core.Session(token, log_usage=not threaded,
+                                                 proxied=proxied))
         log.info('Initialized swarm with %d fairies', len(self.fairies))
 
     @staticmethod
@@ -53,10 +60,21 @@ class Swarm:
             return {'data': errors, 'status': failure_code, 'success': False}
         return {'data': success_data, 'status': success_code, 'success': True}
 
-    def _request(self, method, url, data=None):
+    def _request(self, method, url, data=None, wait=False):
         results = []
-        for fairy in self.fairies:
-            results.append(method(fairy, url, data=data))
+        if not self.threaded:
+            for fairy in self.fairies:
+                results.append(method(fairy, url, data=data))
+        else:
+            futures = []
+            for fairy in self.fairies:
+                futures.append(self.executor.submit(method, fairy, url, data=data))
+            if wait:
+                for future in futures:
+                    results.append(future.result())
+            else:
+                self.futures.extend(futures)
+                return True
         return self._aggregate(results)
 
     def add(self, fairy):
@@ -64,17 +82,18 @@ class Swarm:
         if isinstance(fairy, core.Session):
             self.fairies.append(fairy)
         else:
-            self.fairies.append(core.Session(fairy, proxied=self.proxied))
+            self.fairies.append(core.Session(fairy, log_usage=not self.threaded,
+                                             proxied=self.proxied))
 
-    def get(self, url):
+    def get(self, url, wait=False):
         """Perform a GET request on the API."""
-        return self._request(core.Session.get, url)
+        return self._request(core.Session.get, url, wait=wait)
 
-    def post(self, url, data=None):
+    def post(self, url, data=None, wait=False):
         """Perform a POST request on the API."""
-        return self._request(core.Session.post, url, data=data)
+        return self._request(core.Session.post, url, data=data, wait=wait)
 
-    def vote(self, modelID, vote=0, gallery=None):
+    def vote(self, modelID, vote=0, gallery=None, wait=False):
         """Vote on a comment or gallery post."""
         VOTES = {-1: 'down', 0: 'veto', 1: 'up'}
         vote = VOTES.get(vote, vote)
@@ -82,4 +101,4 @@ class Swarm:
         if gallery is None:
             gallery = isinstance(modelID, str) and re.match(r'^[0-9]{6,12}', modelID) is None
         url = f'{"gallery" if gallery else "comment"}/{modelID}/vote/{vote}'
-        return self.post(url)
+        return self.post(url, wait=wait)
