@@ -102,3 +102,27 @@ class Swarm:
             gallery = isinstance(modelID, str) and re.match(r'^[0-9]{6,12}', modelID) is None
         url = f'{"gallery" if gallery else "comment"}/{modelID}/vote/{vote}'
         return self.post(url, wait=wait)
+
+    def get_future_count(self):
+        """Return current number of futures."""
+        return len(self.futures)
+
+    def get_future_done(self):
+        """Return current number of finished futures."""
+        return len([future for future in self.futures if future.done()])
+
+    def get_future_running(self):
+        """Return current number of running futures."""
+        return len([future for future in self.futures if future.running()])
+
+    def get_future_on_hold(self):
+        """Return current number of waiting futures."""
+        return len([future for future in self.futures
+                    if not future.done() and not future.running()])
+
+    def get_future_counts(self):
+        """Return current numbers of futures in states."""
+        return {'on_hold': self.get_future_on_hold(),
+                'running': self.get_future_running(),
+                'done':    self.get_future_done(),
+                'total':   self.get_future_count()}
