@@ -80,6 +80,6 @@ class Swarm:
         vote = VOTES.get(vote, vote)
         # Try to match a comment ID (full numerical)
         if gallery is None:
-            gallery = re.match(r'^[0-9]{6,12}', modelID) is None
+            gallery = isinstance(modelID, str) and re.match(r'^[0-9]{6,12}', modelID) is None
         url = f'{"gallery" if gallery else "comment"}/{modelID}/vote/{vote}'
         return self.post(url)
