@@ -126,3 +126,21 @@ class Swarm:
                 'running': self.get_future_running(),
                 'done':    self.get_future_done(),
                 'total':   self.get_future_count()}
+
+    def get_future_bar(self, bar_width=60, show_count=True):
+        """Returns a progress bar based on the current futures running.
+
+        bar_width : width of the progress bar, excluding brackets
+        show_count: print the numbers to the right of the bar"""
+        stats = self.get_future_counts()
+        total = stats['total']
+        progress = ''
+        if not total:
+            return progress
+        progress += '=' * (stats['done'] * bar_width // total)
+        progress += '>' * (stats['running'] * bar_width // total)
+        progress += ' ' * (bar_width - len(progress))
+        progress = '[%s]' % progress
+        if show_count:
+            progress += ' {done}/{running}/{on_hold}'.format(**stats)
+        return progress
